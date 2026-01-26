@@ -1,55 +1,85 @@
 #include <stdlib.h>
-#include <errno.h>
 #include <string.h>
 #include "hash_map.h"
 
-// Helper
+// Helpers
 size_t hash(HashMap *table, const char *key) {
     const size_t FNV_offset_basis = 14695981039346656037ULL;
     const size_t FNV_prime = 1099511628211ULL;
-
     size_t hash_val = FNV_offset_basis;
 
     for (size_t i = 0; key[i] != '\0'; i++) {
         hash_val ^= (unsigned char)key[i];
         hash_val *= FNV_prime;
     }
-
     return hash_val % table->size;
 }
 
-// Funcions
-HashMap *create_table(size_t size) {
-    HashMap *map = malloc(sizeof(HashMap));
-    if (!map) return NULL;
+static void resize_table(HashMap *table) {
+    size_t old_size = table->size;
+    size_t new_size = old_size * 2;
+    
+    Entry **new_buckets = calloc(new_size, sizeof(Entry *));
+    if (!new_buckets) return;
 
-    map->size = size;
-    map->count = 0;
+    for (size_t i = 0; i < old_size; i++) {
+        Entry *entry = table->buckets[i];
+        while (entry) {
+            Entry *next = entry->next;
 
-    map->buckets = calloc(size, sizeof(Entry *));
-    if (!map->buckets) {
-        free(map);
-        return NULL;
+            const size_t FNV_offset_basis = 14695981039346656037ULL;
+            const size_t FNV_prime = 1099511628211ULL;
+            size_t h = FNV_offset_basis;
+            for (size_t j = 0; entry->key[j] != '\0'; j++) {
+                h ^= (unsigned char)entry->key[j];
+                h *= FNV_prime;
+            }
+
+            size_t inx = h % new_size;
+
+            entry->next = new_buckets[inx];
+            new_buckets[inx] = entry;
+            entry = next;
+        }
     }
 
-    return map;
+    free(table->buckets);
+    table->buckets = new_buckets;
+    table->size = new_size;
+}
+
+// Functions
+HashMap *create_table(size_t size) {
+    HashMap *table = malloc(sizeof(HashMap));
+    if (!table) return NULL;
+
+    table->size = size;
+    table->count = 0;
+    table->buckets = calloc(size, sizeof(Entry *));
+    if (!table->buckets) {
+        free(table);
+        return NULL;
+    }
+    return table;
 }
 
 void set_item(HashMap *table, const char *key, const char *value) {
+    if ((float)table->count / table->size > 0.75f) {
+        resize_table(table);
+    }
+
     size_t index = hash(table, key);
-    Entry *current = table->buckets[index];
+    Entry *currently = table->buckets[index];
 
-    // TODO: function to double the array size and realloc all the itens
-    while (current) {
-        if (strcmp(current->key, key) == 0) {
+    while (currently) {
+        if (strcmp(currently->key, key) == 0) {
             char *new_val = strdup(value);
-            if(!new_val) return;
-
-            free(current->value);
-            current->value = new_val;
+            if (!new_val) return;
+            free(currently->value);
+            currently->value = new_val;
             return;
         }
-        current = current->next;
+        currently = currently->next;
     }
 
     Entry *new_entry = malloc(sizeof(Entry));
@@ -65,7 +95,7 @@ void set_item(HashMap *table, const char *key, const char *value) {
         return;
     }
 
-    new_entry->next = table->buckets[index];    
+    new_entry->next = table->buckets[index];
     table->buckets[index] = new_entry;
     table->count++;
 }

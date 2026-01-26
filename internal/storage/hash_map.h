@@ -20,5 +20,5 @@ void set_item(HashMap *table, const char *key, const char *value);
 char *get_item(HashMap *table, const char *key);
 void remove_item(HashMap *table, const char *key);
 void free_table(HashMap *table);
-int hash(HashMap *table, const char *key);
+size_t hash(HashMap *table, const char *key);
 #endif
