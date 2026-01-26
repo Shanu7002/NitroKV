@@ -1,31 +1,56 @@
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
 #include "hash_map.h"
 
 // Helper
-int is_int(const char *str, int *out) {
-    char *end;
-    errno = 0;
+size_t hash(HashMap *table, const char *key) {
+    size_t hash = 0;
 
-    long val = strtol(str, &end, 10);
-
-    if (errno != 0 || *end != '\0') {
-        return 0;
-    }
-
-    *out = (int) val;
-    return 1;
-}
-
-int hash(HashMap *table, const char *key) {
-    int value;
-    int hash;
-
-    if (is_int(key, &value)) {
-        return value % table->size;
-    }
-    for (int i = 0; key[i] != "\0"; i++) {
-        hash += key[i];
+    for (size_t i = 0; key[i] != '\0'; i++) {
+        hash += (unsigned char)key[i];
     }
     return hash % table->size;
+}
+
+// Funcions
+
+HashMap *create_table(size_t size) {
+    HashMap *map = malloc(sizeof(HashMap));
+    if (!map) return NULL;
+
+    map->size = size;
+    map->count = 0;
+
+    map->buckets = calloc(size, sizeof(Entry *));
+    if (!map->buckets) {
+        free(map);
+        return NULL;
+    }
+
+    return map;
+}
+
+void set_item(HashMap *table, const char *key, const char *value) {
+    size_t index = hash(table, key);
+
+    Entry *current = table->buckets[index];
+
+    // TODO: function to double the array size and realloc all the itens
+    while (current) {
+        if (strcmp(current->key, key) == 0) {
+            free(current->value);
+            current->value = strdup(value);
+            return;
+        }
+        current = current->next;
+    }
+
+    Entry *new_entry = malloc(sizeof(Entry));
+    new_entry->key = strdup(key);
+    new_entry->value = strdup(value);
+    new_entry->next = table->buckets[index];
+    
+    table->buckets[index] = new_entry;
+    table->count++;
 }
