@@ -1,12 +1,23 @@
-nitro_test: internal/storage/hash_map.c internal/storage/main.c
-	$(CC) $(CFLAGS) $^ -o $@
+# Variables
+CC = GCC
+CFLAGS = -Wall -Wextra -g -I./internal/storage
+TARGET = nitro_test
+SRCS = internal/storage/hash_map.c internal/storage/main.c
 
-remove: 
-	rm -r nitro_test
+.PHONY: all compile run valgrind clean run_dev
 
-compile:	nitro_test
+$(TARGET): $(SRCS)
+		$(CC) $(CFLAGS) $^ -o $@
 
-run: 
-	./nitro_test
+compile: $(TARGET)
 
-clear:	remove
+run: $(TARGET)
+		./$@
+
+valgrind: $(TARGET)
+	valgrind --leak-check=full --show-leak-kinds=all ./$@
+
+run_dev: valgrind
+
+clean:	
+		rm -r $(TARGET)

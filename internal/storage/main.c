@@ -31,7 +31,7 @@ int main() {
     }
 
     free_table(map);
-    printf("Test complete. Check with Valgrind now!\n");
+    printf("Table free\n");
 
     return 0;
 }
