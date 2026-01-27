@@ -3,7 +3,7 @@
 #include "hash_map.h"
 
 // Helpers
-size_t hash(HashMap *table, const char *key) {
+static size_t get_hash_raw(const char *key) {
     const size_t FNV_offset_basis = 14695981039346656037ULL;
     const size_t FNV_prime = 1099511628211ULL;
     size_t hash_val = FNV_offset_basis;
@@ -12,6 +12,11 @@ size_t hash(HashMap *table, const char *key) {
         hash_val ^= (unsigned char)key[i];
         hash_val *= FNV_prime;
     }
+
+    return hash_val;
+}
+
+size_t hash(HashMap *table, size_t hash_val) {
     return hash_val % table->size;
 }
 
@@ -27,14 +32,7 @@ static void resize_table(HashMap *table) {
         while (entry) {
             Entry *next = entry->next;
 
-            const size_t FNV_offset_basis = 14695981039346656037ULL;
-            const size_t FNV_prime = 1099511628211ULL;
-            size_t h = FNV_offset_basis;
-            for (size_t j = 0; entry->key[j] != '\0'; j++) {
-                h ^= (unsigned char)entry->key[j];
-                h *= FNV_prime;
-            }
-
+            size_t h = get_hash_raw(next->key);
             size_t inx = h % new_size;
 
             entry->next = new_buckets[inx];
@@ -116,6 +114,34 @@ const char *get_item(HashMap *table, const char *key) {
     }
 
     return NULL;
+}
+
+void remove_item(HashMap *table, const char *key) {
+    if (!table || !key) return;
+
+    size_t index = hash(table, key);
+    Entry *currently = table->buckets[index];
+    Entry *prev = NULL;
+
+    while (currently) {
+        if (strcmp(currently->key, key) == 0) {
+            if (prev) {
+                prev->next = currently->next;
+            } else {
+                table->buckets[index] = currently->next;
+            }
+
+            free(currently->key);
+            free(currently->value);
+            free(currently);
+
+            table->count--;
+            return;
+        }
+
+        prev = currently;
+        currently = currently->next;
+    }
 }
 
 void free_table(HashMap *table) {
