@@ -102,7 +102,7 @@ void set_item(HashMap *table, const char *key, const char *value) {
 
 const char *get_item(HashMap *table, const char *key) {
     if (!table || !key) return NULL;
-    
+
     size_t index = hash(table, key);
     Entry *currently = table->buckets[index];
 
@@ -116,4 +116,25 @@ const char *get_item(HashMap *table, const char *key) {
     }
 
     return NULL;
+}
+
+void free_table(HashMap *table) {
+    if (!table) return;
+
+    for (size_t i = 0; i < table->size; i++) {
+        Entry *currently = table->buckets[i];
+        
+        while (currently) {
+            Entry *next = currently->next;
+
+            free(currently->key);
+            free(currently->value);
+            free(currently);
+
+            currently = next;
+        }
+    }
+
+    free(table->buckets);
+    free(table);
 }
