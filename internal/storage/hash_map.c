@@ -99,3 +99,21 @@ void set_item(HashMap *table, const char *key, const char *value) {
     table->buckets[index] = new_entry;
     table->count++;
 }
+
+const char *get_item(HashMap *table, const char *key) {
+    if (!table || !key) return NULL;
+    
+    size_t index = hash(table, key);
+    Entry *currently = table->buckets[index];
+
+    while (currently) {
+        if (strcmp(currently->key, key) == 0) {
+            printf("%s ==> %s\n", currently->key, currently->value);
+            return currently->value; 
+        }
+
+        currently = currently->next;
+    }
+
+    return NULL;
+}
