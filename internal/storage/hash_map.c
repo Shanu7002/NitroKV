@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include "hash_map.h"
 
 // Helpers
@@ -32,7 +33,7 @@ static void resize_table(HashMap *table) {
         while (entry) {
             Entry *next = entry->next;
 
-            size_t h = get_hash_raw(next->key);
+            size_t h = get_hash_raw(entry->key);
             size_t inx = h % new_size;
 
             entry->next = new_buckets[inx];
@@ -66,7 +67,10 @@ void set_item(HashMap *table, const char *key, const char *value) {
         resize_table(table);
     }
 
-    size_t index = hash(table, key);
+    if (!table || !key || !value) return;
+
+    size_t raw_hash = get_hash_raw(key);
+    size_t index = hash(table, raw_hash);
     Entry *currently = table->buckets[index];
 
     while (currently) {
@@ -101,7 +105,8 @@ void set_item(HashMap *table, const char *key, const char *value) {
 const char *get_item(HashMap *table, const char *key) {
     if (!table || !key) return NULL;
 
-    size_t index = hash(table, key);
+    size_t raw_hash = get_hash_raw(key);
+    size_t index = hash(table, raw_hash);
     Entry *currently = table->buckets[index];
 
     while (currently) {
@@ -119,7 +124,8 @@ const char *get_item(HashMap *table, const char *key) {
 void remove_item(HashMap *table, const char *key) {
     if (!table || !key) return;
 
-    size_t index = hash(table, key);
+    size_t raw_hash = get_hash_raw(key);
+    size_t index = hash(table, raw_hash);
     Entry *currently = table->buckets[index];
     Entry *prev = NULL;
 
