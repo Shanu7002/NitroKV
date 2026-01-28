@@ -1,3 +1,3 @@
-module github.com/Shanu7002/nitrokv
+module nitrokv
 
 go 1.22.0
