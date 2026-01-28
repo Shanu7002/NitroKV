@@ -22,8 +22,31 @@ void test_basic_crud() {
     printf("test_basic_crud passed!\n");
 }
 
+void test_removal() {
+    printf("Running test_removal\n");
+    HashMap *map = create_table(16);
+
+    set_item(map, "key1", "value1");
+    set_item(map, "key2", "value2");
+
+    assert(strcmp(get_item(map, "key1"), "value1") == 0);
+    assert(strcmp(get_item(map, "key2"), "value2") == 0);
+
+    remove_item(map, "key1");
+    remove_item(map, "key2");
+
+    assert(get_item(map, "key1") == NULL);
+    assert(get_item(map, "key2") == NULL);
+
+    assert(map->count == 0);
+
+    free_table(map);
+    printf("test_removal passed!\n");
+}
 int main() {
     test_basic_crud();
+    printf("-------------------------\n");
+    test_removal();
 
     printf("\nALL TESTS PASSED SUCESSFULLY\n");
     return 0;
