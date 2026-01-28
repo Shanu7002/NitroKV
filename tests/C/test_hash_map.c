@@ -69,12 +69,37 @@ void test_resize_integrity() {
     printf("test_resize_integrity passed!\n");
 }
 
+void test_collisions() {
+    printf("Running test_collisions\n");
+    HashMap *map = create_table(1);
+
+    set_item(map, "key_a", "value_a");
+    set_item(map, "key_b", "value_b");
+    set_item(map, "key_c", "value_c");
+
+    assert(map->count == 3);
+    assert(strcmp(get_item(map, "key_a"), "value_a") == 0);
+    assert(strcmp(get_item(map, "key_b"), "value_b") == 0);
+    assert(strcmp(get_item(map, "key_c"), "value_c") == 0);
+
+    remove_item(map, "key_b");
+    assert(get_item(map, "key_b") == NULL);
+    assert(strcmp(get_item(map, "key_a"), "value_a") == 0);
+    assert(strcmp(get_item(map, "key_c"), "value_c") == 0);
+
+    free_table(map);
+    printf("test_collisions passed!\n");
+}
+
 int main() {
+    printf("-------------------------\n");
     test_basic_crud();
     printf("-------------------------\n");
     test_removal();
     printf("-------------------------\n");
     test_resize_integrity();
+    printf("-------------------------\n");
+    test_collisions();
 
     printf("\nALL TESTS PASSED SUCESSFULLY\n");
     return 0;
