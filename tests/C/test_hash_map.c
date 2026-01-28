@@ -43,10 +43,38 @@ void test_removal() {
     free_table(map);
     printf("test_removal passed!\n");
 }
+
+void test_resize_integrity() {
+    printf("Running test_resize\n");
+    HashMap *map = create_table(4);
+
+    for (int i = 0; i < 100; i++) {
+        char key[20], val[20];
+        sprintf(key, "k%d", i);
+        sprintf(val, "v%d", i);
+        set_item(map, key, val);
+    }
+
+    assert(map->size > 4);
+    assert(map->count == 100);
+
+    for (int i = 0; i < 100; i++) {
+        char key[20], expected_val[20];
+        sprintf(key, "k%d", i);
+        sprintf(expected_val, "v%d", i);
+        assert(strcmp(get_item(map, key), expected_val) == 0);
+    }
+
+    free_table(map);
+    printf("test_resize_integrity passed!\n");
+}
+
 int main() {
     test_basic_crud();
     printf("-------------------------\n");
     test_removal();
+    printf("-------------------------\n");
+    test_resize_integrity();
 
     printf("\nALL TESTS PASSED SUCESSFULLY\n");
     return 0;

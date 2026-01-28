@@ -111,7 +111,7 @@ const char *get_item(HashMap *table, const char *key) {
 
     while (currently) {
         if (strcmp(currently->key, key) == 0) {
-            printf("%s ==> %s\n", currently->key, currently->value);
+            // printf("%s ==> %s\n", currently->key, currently->value);
             return currently->value; 
         }
 
