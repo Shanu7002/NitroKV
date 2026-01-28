@@ -1,7 +1,10 @@
+#define _POSIX_C_SOURCE 199309L
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <time.h>
 #include "../../internal/storage/hash_map.h"
+
 
 void test_basic_crud() {
     printf("Running test_basic_crud\n");
@@ -91,6 +94,28 @@ void test_collisions() {
     printf("test_collisions passed!\n");
 }
 
+void test_stress() {
+    HashMap *map = create_table(16);
+    
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    for (int i = 0; i < 1000000; i++) {
+        char key[32], value[32];
+        sprintf(key, "k%d", i);
+        sprintf(value, "v%d", i);
+        set_item(map, key, value);
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+
+    double elapsed = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
+
+    printf("stress test takes %.9f seconds\n", elapsed);
+
+    free_table(map);
+}
+
 int main() {
     printf("-------------------------\n");
     test_basic_crud();
@@ -100,6 +125,7 @@ int main() {
     test_resize_integrity();
     printf("-------------------------\n");
     test_collisions();
+    //test_stress();
 
     printf("\nALL TESTS PASSED SUCESSFULLY\n");
     return 0;

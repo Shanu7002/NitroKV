@@ -63,7 +63,7 @@ HashMap *create_table(size_t size) {
 }
 
 void set_item(HashMap *table, const char *key, const char *value) {
-    if ((float)table->count / table->size > 0.75f) {
+    if ((double)table->count / table->size > 0.75f) {
         resize_table(table);
     }
 
