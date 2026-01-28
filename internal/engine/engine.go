@@ -9,6 +9,7 @@ package engine
 import "C"
 import (
 	"errors"
+	"unsafe"
 )
 
 type Engine struct {
@@ -28,4 +29,24 @@ func (e *Engine) Close() {
 		C.free_table(e.table)
 		e.table = nil
 	}
+}
+
+func (e *Engine) Set(key, value string) {
+	cKey := C.CString(key)
+	cValue := C.CString(value)
+	defer C.free(unsafe.Pointer(cKey))
+	defer C.free(unsafe.Pointer(cValue))
+
+	C.set_item(e.table, cKey, cValue)
+}
+
+func (e *Engine) Get(key string) (string, bool) {
+	cKey := C.CString(key)
+	defer C.free(unsafe.Pointer(cKey))
+
+	res := C.get_item(e.table, cKey)
+	if res == nil {
+		return "", false
+	}
+	return C.GoString(res), true
 }

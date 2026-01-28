@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"nitrokv/internal/engine"
 )
 
@@ -10,4 +11,9 @@ func main() {
 		panic(err)
 	}
 	defer kv.Close()
+
+	kv.Set("status", "connected")
+	if val, ok := kv.Get("status"); ok {
+		fmt.Println("Value from C engine:", val)
+	}
 }
