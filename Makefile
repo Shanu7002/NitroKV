@@ -2,7 +2,7 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -g -I./internal/storage
 TARGET = nitro_test
-SRCS = internal/storage/hash_map.c tests/C/test_hash_map.c
+SRCS = internal/storage/hash_map.c tests/unit/test_hash_map.c
 
 .PHONY: all compile run valgrind clean
 
