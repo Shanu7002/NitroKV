@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strings"
 )
 
 type Message struct {
 	from    string
 	payload []byte
+	conn    net.Conn
 }
 
 type Server struct {
@@ -79,6 +81,26 @@ func main() {
 	go func() {
 		for msg := range server.msgch {
 			fmt.Printf("received massage from connection (%s): %s\n", msg.from, string(msg.payload))
+
+			if len(msg.payload) == 0 {
+				continue
+			}
+			text := strings.TrimSpace(string(msg.payload))
+
+			parts := strings.Fields(text)
+			if len(parts) == 0 {
+				continue
+			}
+
+			command := strings.ToUpper(parts[0])
+			switch command {
+			case "SET":
+				fmt.Println("Case set")
+			case "GET":
+				fmt.Println("Case get")
+			default:
+				fmt.Println("case default")
+			}
 		}
 	}()
 
