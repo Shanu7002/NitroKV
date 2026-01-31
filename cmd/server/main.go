@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"nitrokv/internal/engine"
 	"strings"
 )
 
@@ -77,6 +78,10 @@ func (s *Server) readLoop(conn net.Conn) {
 
 func main() {
 	server := NewServer(":6379")
+	newMap, err := engine.New(16)
+	if err != nil {
+		fmt.Println("internal server error.")
+	}
 
 	go func() {
 		for msg := range server.msgch {
@@ -95,9 +100,26 @@ func main() {
 			command := strings.ToUpper(parts[0])
 			switch command {
 			case "SET":
-				fmt.Println("Case set")
+				if len(parts) < 3 {
+					msg.conn.Write([]byte("ERR: SET requires key and value.\n"))
+					continue
+				}
+				key := parts[1]
+				value := parts[2]
+				newMap.Set(key, value)
+				fmt.Printf("key '%s' was setted with value '%s'\n", key, value)
 			case "GET":
-				fmt.Println("Case get")
+				if len(parts) < 2 {
+					msg.conn.Write([]byte("ERR: GET requires a key.\n"))
+					continue
+				}
+				key := parts[1]
+				res, status := newMap.Get(key)
+				if status == false {
+					fmt.Println("Key not found!")
+					continue
+				}
+				fmt.Printf("Value: %s\n", res)
 			default:
 				fmt.Println("case default")
 			}
