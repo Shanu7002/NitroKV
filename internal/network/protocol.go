@@ -30,20 +30,32 @@ func (p *ProtocolManager) HandleCommand(msg Message) {
 	command := strings.ToUpper(parts[0])
 	switch command {
 	case "REGISTER":
+		if len(parts) < 2 {
+			fmt.Fprintln(msg.Conn, "ERR: REGISTER requires a name.")
+			return
+		}
+		p.handleRegister(msg, parts)
 	case "LOGIN":
+		if len(parts) < 2 {
+			fmt.Fprintln(msg.Conn, "ERR: LOGIN requires a name.")
+			return
+		}
+		p.handleLogin(msg, parts)
 	case "SET":
 		if len(parts) < 3 {
 			fmt.Fprintln(msg.Conn, "ERR: SET requires key and value.")
 			return
 		}
 		p.handleSet(msg, parts)
-
 	case "GET":
 		if len(parts) < 2 {
 			fmt.Fprintf(msg.Conn, "ERR: GET requires a key.\n")
 			return
 		}
 		res, status := p.handleGet(msg, parts)
+		if res == "login" {
+			return
+		}
 		if status == false {
 			fmt.Fprintf(msg.Conn, "ERR: Key not found!\n")
 			return
@@ -74,12 +86,40 @@ func (p *ProtocolManager) HandleCommand(msg Message) {
 	}
 }
 
-func (p *ProtocolManager) handleRegister(msg Message, parts string) {
+func (p *ProtocolManager) handleRegister(msg Message, parts []string) {
+	dbName := parts[1]
 
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if _, exist := p.dbs[dbName]; exist {
+		fmt.Fprintf(msg.Conn, "Database '%s' is already taken\n", dbName)
+		return
+	}
+	db, err := engine.New(16)
+	if err != nil {
+		fmt.Fprintln(msg.Conn, "ERR: Failed to create database")
+		return
+	}
+
+	p.dbs[dbName] = db
+	fmt.Fprintf(msg.Conn, "OK: Database '%s' registered\n", dbName)
 }
 
-func (p *ProtocolManager) handleLogin(msg Message, parts string) {
+func (p *ProtocolManager) handleLogin(msg Message, parts []string) {
+	dbName := parts[1]
+	connection := msg.From
 
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if _, exist := p.dbs[dbName]; !exist {
+		fmt.Fprintf(msg.Conn, "ERR: Database '%s' not found.\n", dbName)
+		return
+	}
+
+	p.sessions[connection] = dbName
+	fmt.Fprintf(msg.Conn, "OK: Using database '%s'\n", dbName)
 }
 
 func (p *ProtocolManager) handleSet(msg Message, parts []string) {
@@ -89,9 +129,14 @@ func (p *ProtocolManager) handleSet(msg Message, parts []string) {
 		fmt.Fprintf(msg.Conn, "ERR: Not logged in. Use LOGIN <db_name>")
 		return
 	}
-	p.mu.RUnlock()
+	defer p.mu.RUnlock()
 
-	targetDB := p.dbs[dbName]
+	targetDB, exists := p.dbs[dbName]
+	if !exists {
+		fmt.Fprintf(msg.Conn, "ERR: Database %s no longer exists\n", dbName)
+		return
+	}
+
 	key, value := parts[1], parts[2]
 
 	targetDB.Set(key, value)
@@ -102,7 +147,7 @@ func (p *ProtocolManager) handleGet(msg Message, parts []string) (string, bool) 
 	dbName, loggedIn := p.sessions[msg.From]
 	if !loggedIn {
 		fmt.Fprintf(msg.Conn, "ERR: Not logged in. Use LOGIN <db_name>")
-		return "", false
+		return "login", false
 	}
 
 	targetDB := p.dbs[dbName]
