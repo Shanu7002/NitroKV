@@ -74,13 +74,14 @@ func (p *ProtocolManager) HandleCommand(msg Message) {
 			fmt.Fprintf(msg.Conn, "ERR: Key not found!\n")
 			return
 		}
-	case "CLOSE":
-		fmt.Fprintf(msg.Conn, "OK: Server-wide map destroyed. Connection closing.\n")
-		p.handleClose(msg)
-		msg.Conn.Close()
 	case "QUIT":
-		fmt.Fprintf(msg.Conn, "Goodbye!\n")
-		msg.Conn.Close()
+		if len(parts) < 2 {
+			fmt.Fprintln(msg.Conn, "ERR: QUIT requires a database name.")
+			return
+		}
+		p.handleQuit(msg, parts)
+	case "CLOSE":
+		p.handleClose(msg)
 	default:
 		fmt.Println("Sorry, this function do not exist.")
 	}
@@ -126,7 +127,7 @@ func (p *ProtocolManager) handleSet(msg Message, parts []string) {
 	p.mu.RLock()
 	dbName, loggedIn := p.sessions[msg.From]
 	if !loggedIn {
-		fmt.Fprintf(msg.Conn, "ERR: Not logged in. Use LOGIN <db_name>")
+		fmt.Fprintln(msg.Conn, "ERR: Not logged in. Use LOGIN <db_name>")
 		return
 	}
 	defer p.mu.RUnlock()
@@ -146,7 +147,7 @@ func (p *ProtocolManager) handleSet(msg Message, parts []string) {
 func (p *ProtocolManager) handleGet(msg Message, parts []string) (string, bool) {
 	dbName, loggedIn := p.sessions[msg.From]
 	if !loggedIn {
-		fmt.Fprintf(msg.Conn, "ERR: Not logged in. Use LOGIN <db_name>")
+		fmt.Fprintf(msg.Conn, "ERR: Not logged in. Use LOGIN <db_name>\n")
 		return "login", false
 	}
 
@@ -160,13 +161,59 @@ func (p *ProtocolManager) handleGet(msg Message, parts []string) (string, bool) 
 }
 
 func (p *ProtocolManager) handleRemove(msg Message, parts []string) {
+	key := parts[1]
 
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	dbName, loggedIn := p.sessions[msg.From]
+	if !loggedIn {
+		fmt.Fprintln(msg.Conn, "ERR: Not logged in. Use LOGIN <db_name>.")
+		return
+	}
+	targetDB := p.dbs[dbName]
+
+	targetDB.Remove(key)
+	fmt.Fprintf(msg.Conn, "OK: %s removed from %s\n", key, dbName)
 }
 
-func (p *ProtocolManager) handleQuit(msg Message) {
-
+func (p *ProtocolManager) handleQuit(msg Message, parts []string) {
+	dbNameMsg := parts[1]
+	dbName, loggedIn := p.sessions[msg.From]
+	if !loggedIn {
+		fmt.Fprintln(msg.Conn, "ERR: Not logged in. Use LOGIN <db_name>")
+		return
+	}
+	if dbNameMsg == dbName {
+		fmt.Fprintf(msg.Conn, "OK: %s connection was closed.\n", dbName)
+		fmt.Fprintf(msg.Conn, "Goodbye!\n")
+		msg.Conn.Close()
+		return
+	}
+	fmt.Fprintf(msg.Conn, "ERR: you are not logged in %s database\n", dbNameMsg)
 }
 
 func (p *ProtocolManager) handleClose(msg Message) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
+	dbName, loggedIn := p.sessions[msg.From]
+	if !loggedIn {
+		fmt.Fprintln(msg.Conn, "ERR: Not logged in. Use LOGIN <db_name>")
+		return
+	}
+
+	targetDB := p.dbs[dbName]
+	targetDB.Close()
+
+	delete(p.dbs, dbName)
+
+	for addr, name := range p.sessions {
+		if name == dbName {
+			delete(p.sessions, addr)
+		}
+	}
+
+	fmt.Fprintf(msg.Conn, "OK: Server-wide database %s destroyed. Connection closing.\n", dbName)
+	msg.Conn.Close()
 }
