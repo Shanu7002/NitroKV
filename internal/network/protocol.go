@@ -36,17 +36,14 @@ func (p *ProtocolManager) HandleCommand(msg Message) {
 			fmt.Fprintln(msg.Conn, "ERR: SET requires key and value.")
 			return
 		}
+		p.handleSet(msg, parts)
 
-		key, value := parts[1], parts[2]
-		p.handleSet(msg, key, value)
-		fmt.Fprintf(msg.Conn, "OK: key '%s' was set with value '%s'\n", key, value)
 	case "GET":
 		if len(parts) < 2 {
 			fmt.Fprintf(msg.Conn, "ERR: GET requires a key.\n")
 			return
 		}
-		key := parts[1]
-		res, status := p.handleGet(msg, key)
+		res, status := p.handleGet(msg, parts)
 		if status == false {
 			fmt.Fprintf(msg.Conn, "ERR: Key not found!\n")
 			return
@@ -57,11 +54,10 @@ func (p *ProtocolManager) HandleCommand(msg Message) {
 			fmt.Fprintf(msg.Conn, "ERR: REMOVE requires a key\n")
 			return
 		}
-		key := parts[1]
 
-		if _, ok := p.handleGet(msg, key); ok {
-			p.handleRemove(msg, key)
-			fmt.Fprintf(msg.Conn, "OK: key '%s' was sucessfully removed!\n", key)
+		if _, ok := p.handleGet(msg, parts); ok {
+			p.handleRemove(msg, parts)
+			// fmt.Fprintf(msg.Conn, "OK: key '%s' was sucessfully removed!\n", key)
 		} else {
 			fmt.Fprintf(msg.Conn, "ERR: Key not found!\n")
 			return
@@ -86,15 +82,39 @@ func (p *ProtocolManager) handleLogin(msg Message, parts string) {
 
 }
 
-func (p *ProtocolManager) handleSet(msg Message, key string, value string) {
+func (p *ProtocolManager) handleSet(msg Message, parts []string) {
+	p.mu.RLock()
+	dbName, loggedIn := p.sessions[msg.From]
+	if !loggedIn {
+		fmt.Fprintf(msg.Conn, "ERR: Not logged in. Use LOGIN <db_name>")
+		return
+	}
+	p.mu.RUnlock()
 
+	targetDB := p.dbs[dbName]
+	key, value := parts[1], parts[2]
+
+	targetDB.Set(key, value)
+	fmt.Fprintf(msg.Conn, "OK: key '%s' was set with value '%s' in '%s'\n", key, value, dbName)
 }
 
-func (p *ProtocolManager) handleGet(msg Message, key string) (string, bool) {
-	return key, true
+func (p *ProtocolManager) handleGet(msg Message, parts []string) (string, bool) {
+	dbName, loggedIn := p.sessions[msg.From]
+	if !loggedIn {
+		fmt.Fprintf(msg.Conn, "ERR: Not logged in. Use LOGIN <db_name>")
+		return "", false
+	}
+
+	targetDB := p.dbs[dbName]
+	key := parts[1]
+
+	if res, ok := targetDB.Get(key); ok {
+		return res, true
+	}
+	return "", false
 }
 
-func (p *ProtocolManager) handleRemove(msg Message, key string) {
+func (p *ProtocolManager) handleRemove(msg Message, parts []string) {
 
 }
 
