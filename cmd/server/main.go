@@ -64,13 +64,13 @@ func (s *Server) readLoop(conn net.Conn) {
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
-			fmt.Println("read error:", err)
-			continue
+			return
 		}
 
 		s.msgch <- Message{
 			from:    conn.RemoteAddr().String(),
 			payload: buf[:n],
+			conn:    conn,
 		}
 
 	}
@@ -79,20 +79,20 @@ func (s *Server) readLoop(conn net.Conn) {
 func main() {
 	server := NewServer(":6379")
 
+	newMap, err := engine.New(16)
+	if err != nil {
+		log.Fatal()
+	}
+
 	go func() {
-		newMap, err := engine.New(16)
-		if err != nil {
-			server.ln.Close()
-			// how can i return user an error without msg.conn?
-		}
 		for msg := range server.msgch {
 			fmt.Printf("received massage from connection (%s): %s", msg.from, string(msg.payload))
 
 			if len(msg.payload) == 0 {
 				continue
 			}
-			text := strings.TrimSpace(string(msg.payload))
 
+			text := strings.TrimSpace(string(msg.payload))
 			parts := strings.Fields(text)
 			if len(parts) == 0 {
 				continue
@@ -102,47 +102,39 @@ func main() {
 			switch command {
 			case "SET":
 				if len(parts) < 3 {
-					msg.conn.Write([]byte("ERR: SET requires key and value.\n"))
+					fmt.Fprintln(msg.conn, "ERR: SET requires key and value.")
 					continue
 				}
-				key := parts[1]
-				value := parts[2]
+
+				key, value := parts[1], parts[2]
 				newMap.Set(key, value)
-				fmt.Printf("key '%s' was set with value '%s'\n", key, value)
+				fmt.Fprintf(msg.conn, "OK: key '%s' was set with value '%s'\n", key, value)
 			case "GET":
 				if len(parts) < 2 {
-					msg.conn.Write([]byte("ERR: GET requires a key.\n"))
+					fmt.Fprintf(msg.conn, "ERR: GET requires a key.\n")
 					continue
 				}
 				key := parts[1]
 				res, status := newMap.Get(key)
 				if status == false {
-					fmt.Println("Key not found!")
+					fmt.Fprintf(msg.conn, "ERR: Key not found!\n")
 					continue
 				}
-				fmt.Printf("Value: %s\n", res)
+				fmt.Fprintf(msg.conn, "OK: Value: %s\n", res)
 			case "REMOVE":
 				if len(parts) < 2 {
-					msg.conn.Write([]byte("ERR: REMOVE requires a key"))
+					fmt.Fprintf(msg.conn, "ERR: REMOVE requires a key")
 					continue
 				}
 				key := parts[1]
 				newMap.Remove(key)
-				fmt.Printf("key '%s' was sucessfully removed!\n", key)
+				fmt.Fprintf(msg.conn, "OK: key '%s' was sucessfully removed!\n", key)
 			case "CLOSE":
-				var answer string
-				fmt.Printf("Do you really want to delete your map? you cannot recovery it (y/n) ")
-				fmt.Scanln(&answer)
-				switch answer {
-				case "y":
-					newMap.Close()
-					fmt.Println("Map destroyed sucessfully!")
-				case "n":
-					continue
-				default:
-					fmt.Println("Wrong input, backing to hub.")
-					continue
-				}
+				fmt.Fprintf(msg.conn, "OK: Server-wide map destroyed. Connection closing.\n")
+				newMap.Close()
+			case "QUIT":
+				fmt.Fprintf(msg.conn, "Goodbye!\n")
+				msg.conn.Close()
 			default:
 				fmt.Println("case default")
 			}

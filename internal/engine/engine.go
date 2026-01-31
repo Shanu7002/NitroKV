@@ -27,6 +27,10 @@ func New(size int) (*Engine, error) {
 }
 
 func (e *Engine) Set(key, value string) {
+	if e.table == nil {
+		return
+	}
+
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -39,6 +43,10 @@ func (e *Engine) Set(key, value string) {
 }
 
 func (e *Engine) Get(key string) (string, bool) {
+	if e.table == nil {
+		return "", false
+	}
+
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
@@ -61,6 +69,10 @@ func (e *Engine) Close() {
 }
 
 func (e *Engine) Remove(key string) {
+	if e.table == nil {
+		return
+	}
+
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
