@@ -125,12 +125,12 @@ func (p *ProtocolManager) handleLogin(msg Message, parts []string) {
 
 func (p *ProtocolManager) handleSet(msg Message, parts []string) {
 	p.mu.RLock()
+	defer p.mu.RUnlock()
 	dbName, loggedIn := p.sessions[msg.From]
 	if !loggedIn {
 		fmt.Fprintln(msg.Conn, "ERR: Not logged in. Use LOGIN <db_name>")
 		return
 	}
-	defer p.mu.RUnlock()
 
 	targetDB, exists := p.dbs[dbName]
 	if !exists {
@@ -203,10 +203,10 @@ func (p *ProtocolManager) handleClose(msg Message) {
 		return
 	}
 
-	targetDB := p.dbs[dbName]
-	targetDB.Close()
-
-	delete(p.dbs, dbName)
+	if targetDB, exists := p.dbs[dbName]; exists {
+		targetDB.Close()
+		delete(p.dbs, dbName)
+	}
 
 	for addr, name := range p.sessions {
 		if name == dbName {
