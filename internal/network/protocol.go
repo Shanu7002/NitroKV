@@ -1,9 +1,11 @@
 package network
 
 import (
+	"bufio"
 	"fmt"
 	"nitrokv/internal/engine"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -40,6 +42,46 @@ func (p *ProtocolManager) persist(dbName, cmd string, parts []string) {
 	}
 
 	f.Sync()
+}
+
+func (p *ProtocolManager) RestoreAll() error {
+	files, err := filepath.Glob("*.log")
+	if err != nil {
+		return err
+	}
+
+	for _, filename := range files {
+		dbName := strings.TrimSuffix(filename, ".log")
+
+		db, _ := engine.New(16)
+
+		file, _ := os.Open(filename)
+		scanner := bufio.NewScanner(file)
+
+		for scanner.Scan() {
+			parts := strings.Fields(scanner.Text())
+			if len(parts) < 2 {
+				continue
+			}
+
+			cmd := strings.ToUpper(parts[0])
+			key := parts[1]
+
+			if cmd == "SET" && len(parts) == 3 {
+				db.Set(key, parts[2])
+			} else if cmd == "REMOVE" {
+				db.Remove(key)
+			}
+		}
+		file.Close()
+
+		p.mu.Lock()
+		p.dbs[dbName] = db
+		p.mu.Unlock()
+
+		fmt.Printf("Restored database: %s\n", dbName)
+	}
+	return nil
 }
 
 func (p *ProtocolManager) HandleCommand(msg Message) {
@@ -104,6 +146,8 @@ func (p *ProtocolManager) HandleCommand(msg Message) {
 		p.handleQuit(msg, parts)
 	case "CLOSE":
 		p.handleClose(msg)
+	case "RESTORE":
+		p.RestoreAll()
 	default:
 		fmt.Println("Sorry, this function do not exist.")
 	}
@@ -184,7 +228,7 @@ func (p *ProtocolManager) handleGet(msg Message, parts []string) (string, bool) 
 }
 
 func (p *ProtocolManager) handleRemove(msg Message, parts []string) {
-	key := parts[1]
+	cmd, key := strings.ToUpper(parts[0]), parts[1]
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -197,6 +241,7 @@ func (p *ProtocolManager) handleRemove(msg Message, parts []string) {
 	targetDB := p.dbs[dbName]
 
 	targetDB.Remove(key)
+	p.persist(dbName, cmd, parts)
 	fmt.Fprintf(msg.Conn, "OK: %s removed from %s\n", key, dbName)
 }
 
