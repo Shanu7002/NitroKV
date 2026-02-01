@@ -3,6 +3,7 @@ package network
 import (
 	"fmt"
 	"nitrokv/internal/engine"
+	"os"
 	"strings"
 	"sync"
 )
@@ -18,6 +19,27 @@ func NewProtocolManager() *ProtocolManager {
 		dbs:      make(map[string]*engine.Engine),
 		sessions: make(map[string]string),
 	}
+}
+
+func (p *ProtocolManager) persist(dbName, cmd string, parts []string) {
+	if cmd != "SET" && cmd != "REMOVE" {
+		return
+	}
+	f, err := os.OpenFile(dbName+".log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Printf("Persistence Error for %s: %v\n", dbName, err)
+		return
+	}
+	defer f.Close()
+
+	switch cmd {
+	case "SET":
+		fmt.Fprintf(f, "SET %s %s\n", parts[1], parts[2])
+	case "REMOVE":
+		fmt.Fprintf(f, "REMOVE %s\n", parts[1])
+	}
+
+	f.Sync()
 }
 
 func (p *ProtocolManager) HandleCommand(msg Message) {
@@ -138,9 +160,10 @@ func (p *ProtocolManager) handleSet(msg Message, parts []string) {
 		return
 	}
 
-	key, value := parts[1], parts[2]
+	cmd, key, value := parts[0], parts[1], parts[2]
 
 	targetDB.Set(key, value)
+	p.persist(dbName, strings.ToUpper(cmd), parts)
 	fmt.Fprintf(msg.Conn, "OK: key '%s' was set with value '%s' in '%s'\n", key, value, dbName)
 }
 
