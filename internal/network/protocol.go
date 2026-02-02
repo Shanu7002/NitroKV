@@ -27,7 +27,7 @@ func (p *ProtocolManager) persist(dbName, cmd string, parts []string) {
 	if cmd != "SET" && cmd != "REMOVE" {
 		return
 	}
-	f, err := os.OpenFile(dbName+".log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile("data/"+dbName+".log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		fmt.Printf("Persistence Error for %s: %v\n", dbName, err)
 		return
@@ -45,7 +45,7 @@ func (p *ProtocolManager) persist(dbName, cmd string, parts []string) {
 }
 
 func (p *ProtocolManager) RestoreAll() error {
-	files, err := filepath.Glob("*.log")
+	files, err := filepath.Glob("data/*.log")
 	if err != nil {
 		return err
 	}
