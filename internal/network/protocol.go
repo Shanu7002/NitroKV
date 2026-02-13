@@ -51,7 +51,8 @@ func (p *ProtocolManager) RestoreAll() error {
 	}
 
 	for _, filename := range files {
-		dbName := strings.TrimSuffix(filename, ".log")
+		dbName := strings.TrimPrefix(filename, "data/")
+		dbName = strings.TrimSuffix(dbName, ".log")
 
 		db, _ := engine.New(16)
 
@@ -82,6 +83,52 @@ func (p *ProtocolManager) RestoreAll() error {
 		fmt.Printf("Restored database: %s\n", dbName)
 	}
 	return nil
+}
+
+func (p *ProtocolManager) RestoreUnique(msg Message, parts []string) bool {
+	files, err := filepath.Glob("data/*.log")
+	if err != nil {
+		return false
+	}
+
+	dbName := parts[1]
+	for _, filename := range files {
+		actuallDbName := strings.TrimPrefix(filename, "data/")
+		actuallDbName = strings.TrimSuffix(actuallDbName, ".log")
+
+		if actuallDbName == dbName {
+			db, _ := engine.New(16)
+
+			file, _ := os.Open(filename)
+			scanner := bufio.NewScanner(file)
+
+			for scanner.Scan() {
+				parts := strings.Fields(scanner.Text())
+				if len(parts) < 2 {
+					continue
+				}
+
+				cmd := strings.ToUpper(parts[0])
+				key := parts[1]
+
+				if cmd == "SET" && len(parts) == 3 {
+					db.Set(key, parts[2])
+				} else if cmd == "REMOVE" {
+					db.Remove(key)
+				}
+			}
+			file.Close()
+
+			p.mu.Lock()
+			p.dbs[dbName] = db
+			p.mu.Unlock()
+
+			fmt.Fprintf(msg.Conn, "Ok: Database '%s' success retored.\n", dbName)
+			fmt.Printf("Restored database: %s\n", dbName)
+			return true
+		}
+	}
+	return false
 }
 
 func (p *ProtocolManager) HandleCommand(msg Message) {
@@ -148,6 +195,17 @@ func (p *ProtocolManager) HandleCommand(msg Message) {
 		p.handleClose(msg)
 	case "RESTORE":
 		p.RestoreAll()
+	case "RECOVER":
+		if len(parts) < 2 {
+			fmt.Fprintf(msg.Conn, "ERR: RECOVER requires a DB.\n")
+			return
+		}
+		status := p.RestoreUnique(msg, parts)
+
+		if status == false {
+			fmt.Fprintf(msg.Conn, "ERR: DB not found!\n")
+			return
+		}
 	default:
 		fmt.Println("Sorry, this function do not exist.")
 	}
