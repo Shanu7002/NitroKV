@@ -44,7 +44,7 @@ func (p *ProtocolManager) persist(dbName, cmd string, parts []string) {
 	f.Sync()
 }
 
-func (p *ProtocolManager) RestoreAll() error {
+func (p *ProtocolManager) RestoreAll(msg Message) error {
 	files, err := filepath.Glob("data/*.log")
 	if err != nil {
 		return err
@@ -80,6 +80,7 @@ func (p *ProtocolManager) RestoreAll() error {
 		p.dbs[dbName] = db
 		p.mu.Unlock()
 
+		fmt.Fprintf(msg.Conn, "Restored database: %s\n", dbName)
 		fmt.Printf("Restored database: %s\n", dbName)
 	}
 	return nil
@@ -194,17 +195,16 @@ func (p *ProtocolManager) HandleCommand(msg Message) {
 	case "CLOSE":
 		p.handleClose(msg)
 	case "RESTORE":
-		p.RestoreAll()
-	case "RECOVER":
-		if len(parts) < 2 {
-			fmt.Fprintf(msg.Conn, "ERR: RECOVER requires a DB.\n")
+		if len(parts) == 1 {
+			p.RestoreAll(msg)
 			return
 		}
-		status := p.RestoreUnique(msg, parts)
+		if len(parts) >= 2 {
+			status := p.RestoreUnique(msg, parts)
 
-		if status == false {
-			fmt.Fprintf(msg.Conn, "ERR: DB not found!\n")
-			return
+			if status == false {
+				fmt.Fprintf(msg.Conn, "ERR: DB not found!\n")
+			}
 		}
 	default:
 		fmt.Println("Sorry, this function do not exist.")
