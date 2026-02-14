@@ -6,6 +6,7 @@ import (
 	"nitrokv/internal/engine"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 )
@@ -36,7 +37,7 @@ func (p *ProtocolManager) persist(dbName, cmd string, parts []string) {
 
 	switch cmd {
 	case "SET":
-		fmt.Fprintf(f, "SET %s %s\n", parts[1], parts[2])
+		fmt.Fprintf(f, "SET \"%s\", %s\n", parts[0], parts[1])
 	case "REMOVE":
 		fmt.Fprintf(f, "REMOVE %s\n", parts[1])
 	}
@@ -158,7 +159,7 @@ func (p *ProtocolManager) HandleCommand(msg Message) {
 			fmt.Fprintln(msg.Conn, "ERR: SET requires key and value.")
 			return
 		}
-		p.handleSet(msg, parts)
+		p.handleSet(msg, text, parts)
 	case "GET":
 		if len(parts) < 2 {
 			fmt.Fprintf(msg.Conn, "ERR: GET requires a key.\n")
@@ -247,7 +248,7 @@ func (p *ProtocolManager) handleLogin(msg Message, parts []string) {
 	fmt.Fprintf(msg.Conn, "OK: Using database '%s'\n", dbName)
 }
 
-func (p *ProtocolManager) handleSet(msg Message, parts []string) {
+func (p *ProtocolManager) handleSet(msg Message, text string, parts []string) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	dbName, loggedIn := p.sessions[msg.From]
@@ -262,7 +263,24 @@ func (p *ProtocolManager) handleSet(msg Message, parts []string) {
 		return
 	}
 
-	cmd, key, value := parts[0], parts[1], parts[2]
+	// if the input text has this format -> SET "key key key", value value
+	re := regexp.MustCompile(`(?i)^set\s+"([^"]+)",\s*(.+)$`)
+	matches := re.FindStringSubmatch(text)
+	if len(matches) == 3 {
+		key := matches[1]
+		value := strings.TrimSpace(matches[2])
+
+		targetDB.Set(key, value)
+		persistArray := [2]string{matches[1], matches[2]}
+		p.persist(dbName, "SET", persistArray[:])
+		fmt.Fprintf(msg.Conn, "OK: key '%s' was set with value '%s' in '%s'\n", key, value, dbName)
+		return
+	}
+
+	// if the input text has this format -> SET key value
+	cmd := parts[0]
+	key := parts[1]
+	value := parts[2]
 
 	targetDB.Set(key, value)
 	p.persist(dbName, strings.ToUpper(cmd), parts)
