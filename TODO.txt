@@ -1,5 +1,6 @@
-1- SET with more words in key and value
+1- SET with more words in key and value -> done
 1.5- GET this new SET model
+1.7- RESTORE should restore this new pattern too, already persisting
 2- Go tests
 2.5- documentation
 3- main server log

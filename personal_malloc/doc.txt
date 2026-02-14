@@ -1,0 +1,8 @@
+-> how to copilate assembly code
+nasm -f elf64 personal_malloc/personal_malloc.asm -o personal_malloc/arena.o
+
+-> GCC to linker work
+gcc -no-pie personal_malloc/arena.c personal_malloc/arena.o -o personal_malloc/test
+
+-> to run
+./personal_malloc/test
