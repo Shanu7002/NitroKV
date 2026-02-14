@@ -165,7 +165,7 @@ func (p *ProtocolManager) HandleCommand(msg Message) {
 			fmt.Fprintf(msg.Conn, "ERR: GET requires a key.\n")
 			return
 		}
-		res, status := p.handleGet(msg, parts)
+		res, status := p.handleGet(msg, text, parts)
 		if res == "login" {
 			return
 		}
@@ -180,7 +180,7 @@ func (p *ProtocolManager) HandleCommand(msg Message) {
 			return
 		}
 
-		if _, ok := p.handleGet(msg, parts); ok {
+		if _, ok := p.handleGet(msg, text, parts); ok {
 			p.handleRemove(msg, parts)
 			// fmt.Fprintf(msg.Conn, "OK: key '%s' was sucessfully removed!\n", key)
 		} else {
@@ -287,7 +287,7 @@ func (p *ProtocolManager) handleSet(msg Message, text string, parts []string) {
 	fmt.Fprintf(msg.Conn, "OK: key '%s' was set with value '%s' in '%s'\n", key, value, dbName)
 }
 
-func (p *ProtocolManager) handleGet(msg Message, parts []string) (string, bool) {
+func (p *ProtocolManager) handleGet(msg Message, text string, parts []string) (string, bool) {
 	dbName, loggedIn := p.sessions[msg.From]
 	if !loggedIn {
 		fmt.Fprintf(msg.Conn, "ERR: Not logged in. Use LOGIN <db_name>\n")
@@ -295,6 +295,20 @@ func (p *ProtocolManager) handleGet(msg Message, parts []string) (string, bool) 
 	}
 
 	targetDB := p.dbs[dbName]
+
+	// if the input text has this format -> GET "key key key"
+	re := regexp.MustCompile(`(?i)^get\s+"([^"]+)"`)
+	matches := re.FindStringSubmatch(text)
+	if len(matches) == 2 {
+		key := matches[1]
+
+		if res, ok := targetDB.Get(key); ok {
+			return res, true
+		}
+
+	}
+
+	// if the input text has this format -> GET key
 	key := parts[1]
 
 	if res, ok := targetDB.Get(key); ok {
