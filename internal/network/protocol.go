@@ -37,7 +37,7 @@ func (p *ProtocolManager) persist(dbName, cmd string, parts []string) {
 
 	switch cmd {
 	case "SET":
-		fmt.Fprintf(f, "SET \"%s\", %s\n", parts[0], parts[1])
+		fmt.Fprintf(f, "SET \"%s\", %s\n", parts[1], parts[2])
 	case "REMOVE":
 		fmt.Fprintf(f, "REMOVE %s\n", parts[1])
 	}
@@ -61,18 +61,31 @@ func (p *ProtocolManager) RestoreAll(msg Message) error {
 		scanner := bufio.NewScanner(file)
 
 		for scanner.Scan() {
-			parts := strings.Fields(scanner.Text())
+			actualText := scanner.Text()
+			parts := strings.Fields(actualText)
 			if len(parts) < 2 {
 				continue
 			}
 
-			cmd := strings.ToUpper(parts[0])
-			key := parts[1]
+			re := regexp.MustCompile(`(?i)^set\s+"([^"]+)",\s*(.+)$`)
+			matches := re.FindStringSubmatch(actualText)
+			if len(matches) == 3 {
+				cmd, key, value := matches[0], matches[1], strings.TrimSpace(matches[2])
 
-			if cmd == "SET" && len(parts) == 3 {
-				db.Set(key, parts[2])
-			} else if cmd == "REMOVE" {
-				db.Remove(key)
+				if cmd == "SET" && len(parts) == 3 {
+					db.Set(key, value)
+				} else if cmd == "REMOVE" {
+					db.Remove(key)
+				}
+			} else {
+				cmd := strings.ToUpper(parts[0])
+				key := parts[1]
+
+				if cmd == "SET" && len(parts) == 3 {
+					db.Set(key, parts[2])
+				} else if cmd == "REMOVE" {
+					db.Remove(key)
+				}
 			}
 		}
 		file.Close()
@@ -105,12 +118,21 @@ func (p *ProtocolManager) RestoreUnique(msg Message, parts []string) bool {
 			scanner := bufio.NewScanner(file)
 
 			for scanner.Scan() {
-				parts := strings.Fields(scanner.Text())
+				actualText := scanner.Text()
+				parts := strings.Fields(actualText)
 				if len(parts) < 2 {
 					continue
 				}
-
 				cmd := strings.ToUpper(parts[0])
+
+				if cmd == "SET" {
+					re := regexp.MustCompile(`(?i)^set\s+"([^"]+)",\s*(.+)$`)
+					matches := re.FindStringSubmatch(actualText)
+					key, value := matches[1], matches[2]
+
+					db.Set(key, value)
+				}
+
 				key := parts[1]
 
 				if cmd == "SET" && len(parts) == 3 {
@@ -271,8 +293,7 @@ func (p *ProtocolManager) handleSet(msg Message, text string, parts []string) {
 		value := strings.TrimSpace(matches[2])
 
 		targetDB.Set(key, value)
-		persistArray := [2]string{matches[1], matches[2]}
-		p.persist(dbName, "SET", persistArray[:])
+		p.persist(dbName, "SET", matches)
 		fmt.Fprintf(msg.Conn, "OK: key '%s' was set with value '%s' in '%s'\n", key, value, dbName)
 		return
 	}
