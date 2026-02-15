@@ -39,7 +39,7 @@ func (p *ProtocolManager) persist(dbName, cmd string, parts []string) {
 	case "SET":
 		fmt.Fprintf(f, "SET \"%s\", %s\n", parts[1], parts[2])
 	case "REMOVE":
-		fmt.Fprintf(f, "REMOVE %s\n", parts[1])
+		fmt.Fprintf(f, "REMOVE \"%s\"\n", parts[1])
 	}
 
 	f.Sync()
@@ -66,26 +66,21 @@ func (p *ProtocolManager) RestoreAll(msg Message) error {
 			if len(parts) < 2 {
 				continue
 			}
+			cmd := strings.ToUpper(parts[0])
 
-			re := regexp.MustCompile(`(?i)^set\s+"([^"]+)",\s*(.+)$`)
-			matches := re.FindStringSubmatch(actualText)
-			if len(matches) == 3 {
-				cmd, key, value := matches[0], matches[1], strings.TrimSpace(matches[2])
+			switch cmd {
+			case "SET":
+				re := regexp.MustCompile(`(?i)^set\s+"([^"]+)",\s*(.+)$`)
+				matches := re.FindStringSubmatch(actualText)
+				key, value := matches[1], matches[2]
 
-				if cmd == "SET" && len(parts) == 3 {
-					db.Set(key, value)
-				} else if cmd == "REMOVE" {
-					db.Remove(key)
-				}
-			} else {
-				cmd := strings.ToUpper(parts[0])
-				key := parts[1]
+				db.Set(key, value)
+			case "REMOVE":
+				re := regexp.MustCompile(`(?i)^remove\s+"([^"]+)"`)
+				matches := re.FindStringSubmatch(actualText)
+				key := matches[1]
 
-				if cmd == "SET" && len(parts) == 3 {
-					db.Set(key, parts[2])
-				} else if cmd == "REMOVE" {
-					db.Remove(key)
-				}
+				db.Remove(key)
 			}
 		}
 		file.Close()
@@ -125,19 +120,18 @@ func (p *ProtocolManager) RestoreUnique(msg Message, parts []string) bool {
 				}
 				cmd := strings.ToUpper(parts[0])
 
-				if cmd == "SET" {
+				switch cmd {
+				case "SET":
 					re := regexp.MustCompile(`(?i)^set\s+"([^"]+)",\s*(.+)$`)
 					matches := re.FindStringSubmatch(actualText)
 					key, value := matches[1], matches[2]
 
 					db.Set(key, value)
-				}
+				case "REMOVE":
+					re := regexp.MustCompile(`(?i)^remove\s+"([^"]+)"`)
+					matches := re.FindStringSubmatch(actualText)
+					key := matches[1]
 
-				key := parts[1]
-
-				if cmd == "SET" && len(parts) == 3 {
-					db.Set(key, parts[2])
-				} else if cmd == "REMOVE" {
 					db.Remove(key)
 				}
 			}
@@ -147,7 +141,7 @@ func (p *ProtocolManager) RestoreUnique(msg Message, parts []string) bool {
 			p.dbs[dbName] = db
 			p.mu.Unlock()
 
-			fmt.Fprintf(msg.Conn, "Ok: Database '%s' success retored.\n", dbName)
+			fmt.Fprintf(msg.Conn, "OK: Database '%s' success retored.\n", dbName)
 			fmt.Printf("Restored database: %s\n", dbName)
 			return true
 		}
