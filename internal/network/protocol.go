@@ -197,7 +197,7 @@ func (p *ProtocolManager) HandleCommand(msg Message) {
 		}
 
 		if _, ok := p.handleGet(msg, text, parts); ok {
-			p.handleRemove(msg, parts)
+			p.handleRemove(msg, text, parts)
 			// fmt.Fprintf(msg.Conn, "OK: key '%s' was sucessfully removed!\n", key)
 		} else {
 			fmt.Fprintf(msg.Conn, "ERR: Key not found!\n")
@@ -332,21 +332,36 @@ func (p *ProtocolManager) handleGet(msg Message, text string, parts []string) (s
 	return "", false
 }
 
-func (p *ProtocolManager) handleRemove(msg Message, parts []string) {
-	cmd, key := strings.ToUpper(parts[0]), parts[1]
-
+func (p *ProtocolManager) handleRemove(msg Message, text string, parts []string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	cmd := parts[1]
 	dbName, loggedIn := p.sessions[msg.From]
 	if !loggedIn {
-		fmt.Fprintln(msg.Conn, "ERR: Not logged in. Use LOGIN <db_name>.")
+		fmt.Fprintln(msg.Conn, "ERR: Not logged in.")
 		return
 	}
+
+	var key string
+	re := regexp.MustCompile(`(?i)^remove\s+"([^"]+)"`)
+	matches := re.FindStringSubmatch(text)
+
+	if len(matches) == 2 {
+		key = matches[1]
+	} else if len(parts) >= 2 {
+		key = parts[1]
+	} else {
+		fmt.Fprintln(msg.Conn, "ERR: REMOVE requires a key.")
+		return
+	}
+
 	targetDB := p.dbs[dbName]
 
 	targetDB.Remove(key)
+
 	p.persist(dbName, cmd, parts)
+
 	fmt.Fprintf(msg.Conn, "OK: %s removed from %s\n", key, dbName)
 }
 
