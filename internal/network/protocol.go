@@ -196,13 +196,7 @@ func (p *ProtocolManager) HandleCommand(msg Message) {
 			return
 		}
 
-		if _, ok := p.handleGet(msg, text, parts); ok {
-			p.handleRemove(msg, text, parts)
-			// fmt.Fprintf(msg.Conn, "OK: key '%s' was sucessfully removed!\n", key)
-		} else {
-			fmt.Fprintf(msg.Conn, "ERR: Key not found!\n")
-			return
-		}
+		p.handleRemove(msg, text, parts)
 	case "QUIT":
 		if len(parts) < 2 {
 			fmt.Fprintln(msg.Conn, "ERR: QUIT requires a database name.")
@@ -309,22 +303,23 @@ func (p *ProtocolManager) handleGet(msg Message, text string, parts []string) (s
 		return "login", false
 	}
 
+	var key string
 	targetDB := p.dbs[dbName]
 
 	// if the input text has this format -> GET "key key key"
 	re := regexp.MustCompile(`(?i)^get\s+"([^"]+)"`)
 	matches := re.FindStringSubmatch(text)
 	if len(matches) == 2 {
-		key := matches[1]
+		key = matches[1]
 
+		fmt.Printf(key)
 		if res, ok := targetDB.Get(key); ok {
 			return res, true
 		}
 
 	}
-
 	// if the input text has this format -> GET key
-	key := parts[1]
+	key = parts[1]
 
 	if res, ok := targetDB.Get(key); ok {
 		return res, true
@@ -336,10 +331,15 @@ func (p *ProtocolManager) handleRemove(msg Message, text string, parts []string)
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	cmd := parts[1]
 	dbName, loggedIn := p.sessions[msg.From]
 	if !loggedIn {
 		fmt.Fprintln(msg.Conn, "ERR: Not logged in.")
+		return
+	}
+
+	targetDB, exists := p.dbs[dbName]
+	if !exists {
+		fmt.Fprintln(msg.Conn, "ERR: Database not found.")
 		return
 	}
 
@@ -349,18 +349,18 @@ func (p *ProtocolManager) handleRemove(msg Message, text string, parts []string)
 
 	if len(matches) == 2 {
 		key = matches[1]
-	} else if len(parts) >= 2 {
-		key = parts[1]
 	} else {
-		fmt.Fprintln(msg.Conn, "ERR: REMOVE requires a key.")
+		key = parts[1]
+	}
+
+	if _, ok := targetDB.Get(key); !ok {
+		fmt.Fprintf(msg.Conn, "ERR: Key '%s' not found!\n", key)
 		return
 	}
 
-	targetDB := p.dbs[dbName]
-
 	targetDB.Remove(key)
 
-	p.persist(dbName, cmd, parts)
+	p.persist(dbName, "REMOVE", []string{"REMOVE", key})
 
 	fmt.Fprintf(msg.Conn, "OK: %s removed from %s\n", key, dbName)
 }
