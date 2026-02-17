@@ -34,7 +34,7 @@ func setupBench(b *testing.B) (*ProtocolManager, string, string) {
 	// 4. Criamos a estrutura de dados necessária
 	os.MkdirAll("data", 0755)
 
-	pm := NewProtocolManager()
+	pm := NewProtocolManager("password", "test")
 	dbName := "bench_db"
 
 	// Registra o DB usando o mock

@@ -4,6 +4,6 @@
 2- Go tests -> done
 2.5- documentation -> done
     2.5.5- help command -> done
-3- main server log
-4- main server acess control
-5- database password? maybe
+3- main server log -> done
+4- main server acess control -> done
+5- database password? maybe -> done

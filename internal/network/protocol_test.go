@@ -36,7 +36,7 @@ func TestCompleteWorkflow(t *testing.T) {
 	defer os.Chdir(oldWd)
 	os.Mkdir("data", 0755)
 
-	pm := NewProtocolManager()
+	pm := NewProtocolManager("password", "test")
 	userA := "127.0.0.1:1001"
 	userB := "127.0.0.1:1002"
 
@@ -87,7 +87,7 @@ func TestRecovery(t *testing.T) {
 	logContent := "SET \"restored_key\", value_recovered\n"
 	os.WriteFile("data/old_db.log", []byte(logContent), 0644)
 
-	pm := NewProtocolManager()
+	pm := NewProtocolManager("password", "test")
 
 	pm.RestoreAll(Message{Conn: &net.TCPConn{}})
 

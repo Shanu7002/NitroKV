@@ -35,3 +35,6 @@ run: build-go
 clean:
 	rm -f $(TARGET_C) $(GO_BINARY)
 	rm -rf data/*.log
+
+bench-server: build-go
+	NITRO_ENV=test ./nitrokv
