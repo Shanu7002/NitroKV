@@ -45,108 +45,23 @@ func (p *ProtocolManager) persist(dbName, cmd string, parts []string) {
 	f.Sync()
 }
 
-func (p *ProtocolManager) RestoreAll(msg Message) error {
-	files, err := filepath.Glob("data/*.log")
-	if err != nil {
-		return err
-	}
-
-	for _, filename := range files {
-		dbName := strings.TrimPrefix(filename, "data/")
-		dbName = strings.TrimSuffix(dbName, ".log")
-
-		db, _ := engine.New(16)
-
-		file, _ := os.Open(filename)
-		scanner := bufio.NewScanner(file)
-
-		for scanner.Scan() {
-			actualText := scanner.Text()
-			parts := strings.Fields(actualText)
-			if len(parts) < 2 {
-				continue
-			}
-			cmd := strings.ToUpper(parts[0])
-
-			switch cmd {
-			case "SET":
-				re := regexp.MustCompile(`(?i)^set\s+"([^"]+)",\s*(.+)$`)
-				matches := re.FindStringSubmatch(actualText)
-				key, value := matches[1], matches[2]
-
-				db.Set(key, value)
-			case "REMOVE":
-				re := regexp.MustCompile(`(?i)^remove\s+"([^"]+)"`)
-				matches := re.FindStringSubmatch(actualText)
-				key := matches[1]
-
-				db.Remove(key)
-			}
-		}
-		file.Close()
-
-		p.mu.Lock()
-		p.dbs[dbName] = db
-		p.mu.Unlock()
-
-		fmt.Fprintf(msg.Conn, "Restored database: %s\n", dbName)
-		fmt.Printf("Restored database: %s\n", dbName)
-	}
-	return nil
-}
-
-func (p *ProtocolManager) RestoreUnique(msg Message, parts []string) bool {
-	files, err := filepath.Glob("data/*.log")
-	if err != nil {
-		return false
-	}
-
-	dbName := parts[1]
-	for _, filename := range files {
-		actuallDbName := strings.TrimPrefix(filename, "data/")
-		actuallDbName = strings.TrimSuffix(actuallDbName, ".log")
-
-		if actuallDbName == dbName {
-			db, _ := engine.New(16)
-
-			file, _ := os.Open(filename)
-			scanner := bufio.NewScanner(file)
-
-			for scanner.Scan() {
-				actualText := scanner.Text()
-				parts := strings.Fields(actualText)
-				if len(parts) < 2 {
-					continue
-				}
-				cmd := strings.ToUpper(parts[0])
-
-				switch cmd {
-				case "SET":
-					re := regexp.MustCompile(`(?i)^set\s+"([^"]+)",\s*(.+)$`)
-					matches := re.FindStringSubmatch(actualText)
-					key, value := matches[1], matches[2]
-
-					db.Set(key, value)
-				case "REMOVE":
-					re := regexp.MustCompile(`(?i)^remove\s+"([^"]+)"`)
-					matches := re.FindStringSubmatch(actualText)
-					key := matches[1]
-
-					db.Remove(key)
-				}
-			}
-			file.Close()
-
-			p.mu.Lock()
-			p.dbs[dbName] = db
-			p.mu.Unlock()
-
-			fmt.Fprintf(msg.Conn, "OK: Database '%s' success retored.\n", dbName)
-			fmt.Printf("Restored database: %s\n", dbName)
-			return true
-		}
-	}
-	return false
+func (p *ProtocolManager) HandleHelp(msg Message) {
+	helpMenu := `
+--- NitroKV Help Menu ---
+Commands:
+  REGISTER <db>      : Creates a new isolated database.
+  LOGIN <db>         : Enters a database session.
+  SET "key", val     : Stores a value (supports quotes for spaces).
+  GET "key"          : Retrieves a value.
+  REMOVE "key"       : Deletes a key.
+  RESTORE            : Reloads all databases from .log files.
+  RESTORE <db>       : Reloads specific database from .log files.
+  CLOSE              : Destroys current DB in memory.
+  QUIT <db>          : Closes your connection.
+  HELP               : Shows this menu.
+-------------------------
+`
+	fmt.Fprint(msg.Conn, helpMenu)
 }
 
 func (p *ProtocolManager) HandleCommand(msg Message) {
@@ -217,6 +132,8 @@ func (p *ProtocolManager) HandleCommand(msg Message) {
 				fmt.Fprintf(msg.Conn, "ERR: DB not found!\n")
 			}
 		}
+	case "HELP":
+		p.HandleHelp(msg)
 	default:
 		fmt.Println("Sorry, this function do not exist.")
 	}
@@ -404,4 +321,108 @@ func (p *ProtocolManager) handleClose(msg Message) {
 
 	fmt.Fprintf(msg.Conn, "OK: Server-wide database %s destroyed. Connection closing.\n", dbName)
 	msg.Conn.Close()
+}
+
+func (p *ProtocolManager) RestoreAll(msg Message) error {
+	files, err := filepath.Glob("data/*.log")
+	if err != nil {
+		return err
+	}
+
+	for _, filename := range files {
+		dbName := strings.TrimPrefix(filename, "data/")
+		dbName = strings.TrimSuffix(dbName, ".log")
+
+		db, _ := engine.New(16)
+
+		file, _ := os.Open(filename)
+		scanner := bufio.NewScanner(file)
+
+		for scanner.Scan() {
+			actualText := scanner.Text()
+			parts := strings.Fields(actualText)
+			if len(parts) < 2 {
+				continue
+			}
+			cmd := strings.ToUpper(parts[0])
+
+			switch cmd {
+			case "SET":
+				re := regexp.MustCompile(`(?i)^set\s+"([^"]+)",\s*(.+)$`)
+				matches := re.FindStringSubmatch(actualText)
+				key, value := matches[1], matches[2]
+
+				db.Set(key, value)
+			case "REMOVE":
+				re := regexp.MustCompile(`(?i)^remove\s+"([^"]+)"`)
+				matches := re.FindStringSubmatch(actualText)
+				key := matches[1]
+
+				db.Remove(key)
+			}
+		}
+		file.Close()
+
+		p.mu.Lock()
+		p.dbs[dbName] = db
+		p.mu.Unlock()
+
+		fmt.Fprintf(msg.Conn, "Restored database: %s\n", dbName)
+		fmt.Printf("Restored database: %s\n", dbName)
+	}
+	return nil
+}
+
+func (p *ProtocolManager) RestoreUnique(msg Message, parts []string) bool {
+	files, err := filepath.Glob("data/*.log")
+	if err != nil {
+		return false
+	}
+
+	dbName := parts[1]
+	for _, filename := range files {
+		actuallDbName := strings.TrimPrefix(filename, "data/")
+		actuallDbName = strings.TrimSuffix(actuallDbName, ".log")
+
+		if actuallDbName == dbName {
+			db, _ := engine.New(16)
+
+			file, _ := os.Open(filename)
+			scanner := bufio.NewScanner(file)
+
+			for scanner.Scan() {
+				actualText := scanner.Text()
+				parts := strings.Fields(actualText)
+				if len(parts) < 2 {
+					continue
+				}
+				cmd := strings.ToUpper(parts[0])
+
+				switch cmd {
+				case "SET":
+					re := regexp.MustCompile(`(?i)^set\s+"([^"]+)",\s*(.+)$`)
+					matches := re.FindStringSubmatch(actualText)
+					key, value := matches[1], matches[2]
+
+					db.Set(key, value)
+				case "REMOVE":
+					re := regexp.MustCompile(`(?i)^remove\s+"([^"]+)"`)
+					matches := re.FindStringSubmatch(actualText)
+					key := matches[1]
+
+					db.Remove(key)
+				}
+			}
+			file.Close()
+
+			p.mu.Lock()
+			p.dbs[dbName] = db
+			p.mu.Unlock()
+
+			fmt.Fprintf(msg.Conn, "OK: Database '%s' success retored.\n", dbName)
+			fmt.Printf("Restored database: %s\n", dbName)
+			return true
+		}
+	}
+	return false
 }
