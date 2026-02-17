@@ -1,23 +1,37 @@
 # Variables
 CC = gcc
 CFLAGS = -Wall -Wextra -g -I./internal/storage
-TARGET = nitro_test
-SRCS = internal/storage/hash_map.c tests/unit/test_hash_map.c
+TARGET_C = nitro_test
+SRCS_C = internal/storage/hash_map.c tests/unit/test_hash_map.c
 
-.PHONY: all compile run valgrind clean
+# Go Variables
+GO_BINARY = nitrokv
+GO_MAIN = cmd/server/main.go
 
-all: compile
+.PHONY: all compile run valgrind clean build-go
 
-$(TARGET): $(SRCS)
+all: compile build-go
+
+# Compile and run C
+$(TARGET_C): $(SRCS_C)
 	$(CC) $(CFLAGS) $^ -o $@
 
-compile: $(TARGET)
+compile: $(TARGET_C)
 
-run: $(TARGET)
-	./$(TARGET)
+run-c: $(TARGET_C)
+	./$(TARGET_C)
 
-valgrind: $(TARGET)
-	valgrind --leak-check=full --show-leak-kinds=all ./$(TARGET)
+valgrind: $(TARGET_C)
+	valgrind --leak-check=full --show-leak-kinds=all ./$(TARGET_C)
+
+# Compile server (Go + CGO)
+build-go:
+	go build -o $(GO_BINARY) $(GO_MAIN)
+
+# Run real server
+run: build-go
+	./$(GO_BINARY)
 
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET_C) $(GO_BINARY)
+	rm -rf data/*.log

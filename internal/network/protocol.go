@@ -11,6 +11,15 @@ import (
 	"sync"
 )
 
+/*
+	General helper
+
+msg -> Message struct that have: 1- Who sent the message (from), 2- Actual message (payload), 3- to return message (Conn)
+text -> Payload to string
+parts -> text divided by fields. parts[0] always the cmd
+cmd -> command. Set, Get, Remove etc
+*/
+
 type ProtocolManager struct {
 	dbs      map[string]*engine.Engine
 	sessions map[string]string
