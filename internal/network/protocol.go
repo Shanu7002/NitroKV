@@ -166,6 +166,9 @@ func (p *ProtocolManager) HandleCommand(msg Message) {
 		p.handleRemove(msg, text, parts)
 	case "QUIT":
 		if len(parts) < 2 {
+			if len(parts) == 1 {
+				msg.Conn.Close()
+			}
 			fmt.Fprintln(msg.Conn, "ERR: QUIT requires a database name.")
 			return
 		}
