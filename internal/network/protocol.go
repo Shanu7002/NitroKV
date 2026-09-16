@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"time"
 )
 
 /*
@@ -22,39 +21,15 @@ cmd -> command. Set, Get, Remove etc
 */
 
 type ProtocolManager struct {
-	dbs           map[string]*engine.Engine
-	sessions      map[string]string
-	adminPassword string
-	env           string
-	authenticated map[string]bool
-	lastRequest   map[string]time.Time
-	mu            sync.RWMutex
+	dbs      map[string]*engine.Engine
+	sessions map[string]string
+	mu       sync.RWMutex
 }
 
-func NewProtocolManager(password, passwordProd string) *ProtocolManager {
+func NewProtocolManager() *ProtocolManager {
 	return &ProtocolManager{
-		dbs:           make(map[string]*engine.Engine),
-		sessions:      make(map[string]string),
-		adminPassword: password,
-		env:           passwordProd,
-		authenticated: make(map[string]bool),
-		lastRequest:   make(map[string]time.Time),
-	}
-}
-
-func (p *ProtocolManager) handleAuth(msg Message, parts []string) {
-	if len(parts) < 2 {
-		fmt.Fprint(msg.Conn, "OK: Operating in Guest Mode (Limited)\n")
-		return
-	}
-
-	if parts[1] == p.adminPassword {
-		p.mu.Lock()
-		p.authenticated[msg.From] = true
-		p.mu.Unlock()
-		fmt.Fprint(msg.Conn, "OK: Admin authenticated. Rate limit removed.\n")
-	} else {
-		fmt.Fprint(msg.Conn, "ERR: Invalid password. Staying in Guest Mode.\n")
+		dbs:      make(map[string]*engine.Engine),
+		sessions: make(map[string]string),
 	}
 }
 
@@ -106,26 +81,7 @@ func (p *ProtocolManager) HandleCommand(msg Message) {
 	}
 	command := strings.ToUpper(parts[0])
 
-	if p.env != "test" && command != "AUTH" && command != "HELP" && command != "QUIT" {
-		p.mu.Lock()
-		isAuth := p.authenticated[msg.From]
-		lastReq := p.lastRequest[msg.From]
-
-		if !isAuth {
-			if time.Since(lastReq) < time.Second {
-				p.mu.Unlock()
-				fmt.Fprint(msg.Conn, "ERR: Rate limit exceeded (1 req/sec for guests). AUTH for more.\n")
-				return
-			}
-		}
-
-		p.lastRequest[msg.From] = time.Now()
-		p.mu.Unlock()
-	}
-
 	switch command {
-	case "AUTH":
-		p.handleAuth(msg, parts)
 	case "REGISTER":
 		if len(parts) < 2 {
 			fmt.Fprintln(msg.Conn, "ERR: REGISTER requires a name.")
@@ -189,7 +145,7 @@ func (p *ProtocolManager) HandleCommand(msg Message) {
 	case "HELP":
 		p.HandleHelp(msg)
 	default:
-		fmt.Fprintln(msg.Conn, "ERR: Unknown command. Type HELP for available commands.")
+		fmt.Println("Sorry, this function do not exist.")
 	}
 }
 
@@ -283,7 +239,7 @@ func (p *ProtocolManager) handleGet(msg Message, text string, parts []string) (s
 	if len(matches) == 2 {
 		key = matches[1]
 
-		fmt.Printf(key)
+		fmt.Print(key)
 		if res, ok := targetDB.Get(key); ok {
 			return res, true
 		}

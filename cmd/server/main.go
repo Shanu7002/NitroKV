@@ -4,19 +4,12 @@ import (
 	"fmt"
 	"log"
 	"nitrokv/internal/network"
-	"os"
 )
 
 func main() {
-	pwd := os.Getenv("NITRO_PWD")
-	if pwd == "" {
-		pwd = "admin"
-	}
-
-	env := os.Getenv("NITRO_ENV")
 
 	server := network.NewServer(":6379")
-	proto := network.NewProtocolManager(pwd, env)
+	proto := network.NewProtocolManager()
 
 	go func() {
 		for msg := range server.Message() {
