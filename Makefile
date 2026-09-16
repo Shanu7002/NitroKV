@@ -40,4 +40,4 @@ clean:
 
 # Run benchmarks
 bench-server: build-go
-	NITRO_ENV=test ./nitrokv
+	go test -bench=. -benchmem -count=5 ./internal/network/...
