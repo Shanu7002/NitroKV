@@ -1,8 +1,8 @@
 # Variables
 CC = gcc
 CFLAGS = -Wall -Wextra -g -I./internal/storage
-TARGET_C = nitro_test
-SRCS_C = internal/storage/hash_map.c tests/unit/test_hash_map.c
+TARGET_C = nitroKV_test
+SOURCE_C = internal/storage/hash_map.c tests/unit/test_hash_map.c
 
 # Go Variables
 GO_BINARY = nitrokv
@@ -12,15 +12,17 @@ GO_MAIN = cmd/server/main.go
 
 all: compile build-go
 
-# Compile and run C
-$(TARGET_C): $(SRCS_C)
+# Compile C tests
+$(TARGET_C): $(SOURCE_C)
 	$(CC) $(CFLAGS) $^ -o $@
 
 compile: $(TARGET_C)
 
-run-c: $(TARGET_C)
+# Run C tests
+run-cTests: $(TARGET_C)
 	./$(TARGET_C)
 
+# Run C test while check for memory leaks
 valgrind: $(TARGET_C)
 	valgrind --leak-check=full --show-leak-kinds=all ./$(TARGET_C)
 
@@ -36,5 +38,6 @@ clean:
 	rm -f $(TARGET_C) $(GO_BINARY)
 	rm -rf data/*.log
 
+# Run benchmarks
 bench-server: build-go
 	NITRO_ENV=test ./nitrokv
